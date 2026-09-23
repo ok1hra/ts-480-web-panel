@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Minimal TS-480 main-unit simulator speaking the panel protocol.
 
 Lets the UI and link layer run without hardware.  It reproduces the framing,

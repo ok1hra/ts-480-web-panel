@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Web front-end replacing the TS-480 control panel.
 
     python -m ts480.server --port /dev/ttyUSB0          # real radio

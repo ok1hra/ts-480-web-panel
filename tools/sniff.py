@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Passive tap between the real TS-480 panel and main unit.
 
 Wire two USB-UART adapters (5 V tolerant!) with only RX + GND connected:

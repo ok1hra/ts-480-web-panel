@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Panel emulation on the serial line: keepalive, query replies, key timing,
 encoder accumulation, reconnect.  Transport-agnostic (real UART, network
 socket via pyserial URL, or the built-in radio simulator)."""

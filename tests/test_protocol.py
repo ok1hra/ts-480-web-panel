@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 from ts480.protocol import (DisplayState, FrameReader, key_msg, vfo_msg, multi_msg,
                             rit_msg, ifshift_msg, volume_msg, decode_panel_frame, KEY_DOWN)
 

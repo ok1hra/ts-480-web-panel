@@ -1,27 +1,29 @@
-# Kontext projektu pro Claude Code
+# Project context for Claude Code
 
-Cíl: softwarová náhrada ovládacího panelu Kenwood TS-480. Aplikace emuluje
-panel na lince panel ↔ rádio (RJ12, 5 V TTL UART, 57600 8N1). Nepoužívá CAT.
+Goal: software replacement of the Kenwood TS-480 control panel. The application
+emulates the panel on the panel ↔ radio link (RJ12, 5 V TTL UART, 57600 8N1).
+It does not use CAT.
 
-## Stav (předáno z cloudové session 2026-09-23)
-- Protokol je převzatý z reverzního inženýrství https://github.com/stianeklund/TS-480-Panel
-  a shrnutý v `PROTOCOL.md`. Značka ✔ = ověřeno v záznamech, ? = odhad.
-- `ts480/protocol.py`: kodek a parser displeje (`DisplayState`). Tabulky `KEYS`,
-  `FLAG_LABELS` a `MODE_NAMES` jsou jediné místo, kde se opravují odhady.
-- `ts480/link.py`: emulace panelu (keepalive FF ~1 s, odpověď na `O` → X/V/W/FF,
-  `02` reconnect, dlouhý stisk `3` po 1 s, sčítání enkodérů po 60 ms).
-- `ts480/sim.py`: zjednodušený simulátor rádia (`--sim`).
-- `ts480/server.py` + `ts480/web/index.html`: aiohttp + WebSocket, UI panelu.
-- `tools/sniff.py`: pasivní odposlech dvou RX linek s dekódováním.
-- Testy: `python -m pytest -q tests`. Ověřeno i v prohlížeči (Playwright) proti simulátoru.
+## Status (handed over from the cloud session 2026-09-23)
+- The protocol is taken from the reverse engineering at https://github.com/stianeklund/TS-480-Panel
+  (Stian Eklund, GPL-3.0) and summarized in `PROTOCOL.md`. Mark ✔ = verified in captures, ? = guess.
+- `ts480/protocol.py`: codec and display parser (`DisplayState`). The tables `KEYS`,
+  `FLAG_LABELS` and `MODE_NAMES` are the only place where guesses get corrected.
+- `ts480/link.py`: panel emulation (keepalive FF ~1 s, reply to `O` → X/V/W/FF,
+  `02` reconnect, long press `3` after 1 s, encoder accumulation over 60 ms).
+- `ts480/sim.py`: simplified radio simulator (`--sim`).
+- `ts480/server.py` + `ts480/web/index.html`: aiohttp + WebSocket, panel UI.
+- `tools/sniff.py`: passive tap of both RX lines with decoding.
+- Tests: `python -m pytest -q tests`. Also verified in a browser (Playwright) against the simulator.
+- License GPL-3.0 (`LICENSE`), credits in `README.md`. All texts are in English.
 
-## Otevřené body
-1. Ověřit snifferem na reálném kusu: kódy MODE (`E`?) a SCAN (`F`?), číslici druhu
-   provozu `9n`, bity `B` a `L`, mapování desetinných teček (`F b1 b2 b3`), význam `3n`.
-2. Zkontrolovat, zda rádio vyžaduje přesné načasování keepalive a stavu `4` (hold).
-3. Nápady: port na ESP32 (UART ↔ WiFi/WebSocket), nf audio přes síť, víc klientů najednou.
+## Open items
+1. Verify with the sniffer on a real unit: codes MODE (`E`?) and SCAN (`F`?), the
+   operating mode digit `9n`, bits `B` and `L`, decimal point mapping (`F b1 b2 b3`), meaning of `3n`.
+2. Check whether the radio requires exact timing of the keepalive and state `4` (hold).
+3. Ideas: port to ESP32 (UART ↔ WiFi/WebSocket), AF audio over the network, multiple clients at once.
 
-## Spuštění
+## Running
     pip install -r requirements.txt
-    python -m ts480.server --sim            # nebo --port /dev/ttyUSB0
+    python -m ts480.server --sim            # or --port /dev/ttyUSB0
     # http://127.0.0.1:8480

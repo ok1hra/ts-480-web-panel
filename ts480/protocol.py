@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 """Kenwood TS-480 control-panel <-> main-unit serial protocol.
 
 Physical layer (RJ12 panel cable):

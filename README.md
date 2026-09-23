@@ -1,90 +1,110 @@
-# TS-480 Panel: softwarová náhrada ovládacího panelu
+# TS-480 Panel: software replacement for the control head
 
-Program emuluje ovládací panel (control head) Kenwood TS-480 přímo na lince
-panel ↔ rádio (RJ12, 57600 Bd TTL). Nepoužívá CAT. Rádio se chová, jako by
-k němu byl připojený originální panel. Vidíte stejný displej, klávesy fungují
-včetně dlouhého stisku, stejně tak knoflíky VFO, MULTI a RIT/XIT a potenciometry
-AF, SQL a IF SHIFT.
+This program emulates the Kenwood TS-480 control panel (control head) directly
+on the panel ↔ radio link (RJ12, 57600 Bd TTL). It does not use CAT. The radio
+behaves as if the original panel were connected. You get the same display, the
+keys work including long press, and so do the VFO, MULTI and RIT/XIT knobs and
+the AF, SQL and IF SHIFT potentiometers.
 
 ```
- prohlížeč (PC / tablet / mobil)
+ browser (PC / tablet / phone)
         │  WebSocket
  ts480.server  (Python, aiohttp)
-        │  PanelLink: keepalive, odpověď na dotaz O, reconnect, sčítání enkodérů
-        │  DisplayState: dekódování příkazů pro LCD
- USB-UART 5 V  ──RJ12──  TS-480 (tělo)
+        │  PanelLink: keepalive, reply to the O query, reconnect, encoder accumulation
+        │  DisplayState: decoding of LCD commands
+ USB-UART 5 V  ──RJ12──  TS-480 (main unit)
 ```
 
-Popis protokolu je v **[PROTOCOL.md](PROTOCOL.md)**.
+The protocol is described in **[PROTOCOL.md](PROTOCOL.md)**.
 
-## Zapojení
+## Wiring
 
-| RJ12 (kabel od rádia) | USB-UART 5 V (FTDI TTL-232R-5V, CH340 v režimu 5 V…) |
+| RJ12 (cable from the radio) | USB-UART 5 V (FTDI TTL-232R-5V, CH340 in 5 V mode…) |
 |---|---|
 | 3 GND | GND |
-| 4 RDO (rádio → panel) | **RX** |
-| 5 TDO (panel → rádio) | **TX** |
-| 6 AF + 1 SPK GND | na nf zesilovač/zvukovku (panel nf nezpracovává) |
-| 2 +8 V | nezapojovat |
+| 4 RDO (radio → panel) | **RX** |
+| 5 TDO (panel → radio) | **TX** |
+| 6 AF + 1 SPK GND | to an AF amplifier / sound card (the panel does not process audio) |
+| 2 +8 V | do not connect |
 
-* Originální panel musí být **odpojený**. Na TX lince může být jen jeden
-  budič.
-* Na piny 4 a 5 nepřipojujte převodník RS-232 (±12 V).
+* The original panel must be **disconnected**. Only one driver may be on the
+  TX line.
+* Do not connect an RS-232 converter (±12 V) to pins 4 and 5.
 
-## Spuštění
+## Running
 
 ```bash
 pip install -r requirements.txt
 python -m ts480.server --port /dev/ttyUSB0            # Windows: --port COM5
-python -m ts480.server --port socket://192.168.1.50:4000   # UART přes síť (ser2net, ESP32…)
-python -m ts480.server --sim                          # vestavěný simulátor, bez hardwaru
-# pak otevřete http://127.0.0.1:8480   (pro síť: --http 0.0.0.0:8480)
+python -m ts480.server --port socket://192.168.1.50:4000   # UART over the network (ser2net, ESP32…)
+python -m ts480.server --sim                          # built-in simulator, no hardware
+# then open http://127.0.0.1:8480   (for network access: --http 0.0.0.0:8480)
 ```
 
-Ovládání:
+Controls:
 
-* Klávesy se ovládají myší nebo dotykem. Držení déle než 1 s pošle dlouhý
-  stisk (`--long-press` mění prahovou dobu).
-* Knoflíky se otáčejí tažením nebo kolečkem myši. Kolečko se Shiftem dává ×10.
-* Klávesnice: `↑`/`↓` ladí VFO, `PgUp`/`PgDn` ovládá MULTI.
-* Přepínač „counts/step“ určuje, kolik impulsů enkodéru pošle jeden krok.
-* „Direct frequency“ zadá frekvenci přes klávesnici panelu (ENT, číslice,
+* Keys are operated by mouse or touch. Holding a key for more than 1 s sends a
+  long press (`--long-press` changes the threshold).
+* Knobs are turned by dragging or with the mouse wheel. Wheel with Shift gives ×10.
+* Keyboard: `↑`/`↓` tunes the VFO, `PgUp`/`PgDn` controls MULTI.
+* The "counts/step" selector sets how many encoder pulses one step sends.
+* "Direct frequency" enters a frequency via the panel keypad (ENT, digits,
   ENT).
-* „Raw frames“ pošle libovolný rámec (`N1` nebo `hex: 4E 31`). Hodí se na
-  experimenty. Log ukazuje veškerý provoz oběma směry i s dekódováním.
+* "Raw frames" sends an arbitrary frame (`N1` or `hex: 4E 31`). Useful for
+  experiments. The log shows all traffic in both directions, including decoding.
 
-## Doladění nezdokumentovaných míst
+## Filling in the undocumented parts
 
-Sniffer `tools/sniff.py` je pasivní odposlech mezi originálním panelem a rádiem.
-Potřebuje dva převodníky, u každého se zapojuje jen RX a GND:
+The sniffer `tools/sniff.py` is a passive tap between the original panel and the
+radio. It needs two adapters, each with only RX and GND connected:
 
 ```bash
 python tools/sniff.py --radio /dev/ttyUSB0 --panel /dev/ttyUSB1 --out tap.jsonl
 ```
 
-Po stisku klávesy na originálním panelu vypíše přijatý rámec a změny
-dekódovaného stavu. Tabulky `KEYS`, `FLAG_LABELS` a `MODE_NAMES`
-v `ts480/protocol.py` jsou na jednom místě a snadno se opraví.
+When a key is pressed on the original panel, it prints the received frame and
+the changes of the decoded state. The tables `KEYS`, `FLAG_LABELS` and
+`MODE_NAMES` in `ts480/protocol.py` are in one place and easy to correct.
 
-## Soubory
+## Files
 
-* `ts480/protocol.py`: kodek (rámce, klávesy, enkodéry, parser displeje)
-* `ts480/link.py`: emulace panelu na lince (keepalive, dotaz `O`, reconnect, časování kláves)
-* `ts480/sim.py`: zjednodušený simulátor těla rádia
-* `ts480/server.py`: web server a WebSocket API
-* `ts480/web/index.html`: UI panelu
-* `tools/sniff.py`: pasivní sniffer
-* `tests/`: testy parseru nad zachycenými výpisy z reálného rádia
+* `ts480/protocol.py`: codec (frames, keys, encoders, display parser)
+* `ts480/link.py`: panel emulation on the line (keepalive, `O` query, reconnect, key timing)
+* `ts480/sim.py`: simplified simulator of the radio main unit
+* `ts480/server.py`: web server and WebSocket API
+* `ts480/web/index.html`: panel UI
+* `tools/sniff.py`: passive sniffer
+* `tests/`: parser tests against captured dumps from a real radio
 
-## Stav
+## Status
 
-Ověřené v zachyceném provozu: rámcování, keepalive, zapnutí a reconnect,
-všechny klávesy kromě MODE a SCAN, VFO, MULTI, RIT, AF, SQL, IF SHIFT,
-frekvence, S-metr, většina ikon.
+Verified in captured traffic: framing, keepalive, power-on and reconnect,
+all keys except MODE and SCAN, VFO, MULTI, RIT, AF, SQL, IF SHIFT,
+frequency, S-meter, most icons.
 
-Odhady (v UI označené „?“ nebo v logu jako `misc`):
+Guesses (marked "?" in the UI or as `misc` in the log):
 
-* kódy kláves MODE (`E`) a SCAN (`F`)
-* tabulka číslice druhu provozu `9n`
-* bity `B` a `L`
-* mapování desetinných teček
+* key codes MODE (`E`) and SCAN (`F`)
+* table of the operating mode digit `9n`
+* bits `B` and `L`
+* decimal point mapping
+
+## Credits and sources
+
+* **[Stian Eklund, stianeklund/TS-480-Panel](https://github.com/stianeklund/TS-480-Panel)**
+  (GPL-3.0): the reverse engineering of the panel ↔ radio protocol this project
+  is built on (logic analyzer captures, key codes, display commands, timing).
+  The power-on dump used in `tests/test_protocol.py` comes from its
+  `Radio/Power on sequence.md`.
+* RemoteRig documentation of the TS-480 separated control head operation.
+* Kenwood TS-480SAT/HX instruction manual (panel layout, key functions).
+
+## License
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See [LICENSE](LICENSE).
+
+Kenwood and TS-480 are trademarks of JVCKENWOOD Corporation. This project is
+not affiliated with or endorsed by Kenwood.
