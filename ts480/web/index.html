@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TS-480 Panel</title>
+<link rel="icon" href="data:,">
+<style>
+:root{
+  --body:#16181b; --body2:#202328; --edge:#0b0c0e; --key:#2b2f35; --key-hi:#3a3f47; --key-tx:#d9dde3;
+  --key-alt:#e0a64a; --ink:#c9ced6; --muted:#7c838d;
+  --lcd-bg1:#f2b04a; --lcd-bg2:#d98c26; --seg:#1a1206; --ghost:rgba(40,25,5,.10);
+  --ok:#3ecf6a; --tx:#ff4b3a; --warn:#e0a64a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:#0e0f11;color:var(--ink);font:14px/1.3 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button{font:inherit}
+.wrap{max-width:1180px;margin:0 auto;padding:16px}
+.top{display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap}
+.brand{font-weight:700;letter-spacing:.14em;color:#e6e9ee}
+.brand small{font-weight:400;letter-spacing:.05em;color:var(--muted);margin-left:8px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;background:var(--body2);color:var(--muted);font-size:12px}
+.dot{width:8px;height:8px;border-radius:50%;background:#555}
+.dot.ok{background:var(--ok);box-shadow:0 0 6px var(--ok)} .dot.bad{background:var(--tx)}
+.spacer{flex:1}
+.tbtn{background:var(--body2);color:var(--ink);border:1px solid #2e3238;border-radius:6px;padding:4px 10px;cursor:pointer}
+.tbtn:hover{background:var(--key-hi)}
+
+/* ---------- panel ---------- */
+.panel{background:linear-gradient(180deg,#24272c,#15171a 60%,#111315);border:1px solid #000;border-radius:18px;
+  box-shadow:inset 0 1px 0 #3a3e44,0 20px 40px rgba(0,0,0,.55);padding:18px;display:grid;
+  grid-template-columns:150px 1fr 250px;gap:18px;user-select:none;-webkit-user-select:none;touch-action:none}
+.col{display:flex;flex-direction:column;gap:10px}
+.keys{display:grid;gap:8px}
+.k{position:relative;background:linear-gradient(180deg,#353940,#262a2f);border:1px solid #0a0b0c;border-radius:7px;
+  color:var(--key-tx);height:38px;min-width:0;padding:0 4px;cursor:pointer;box-shadow:inset 0 1px 0 rgba(255,255,255,.08),0 2px 0 #050506;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;font-weight:600;letter-spacing:.03em}
+.k .alt{font-size:9px;font-weight:600;color:var(--key-alt);letter-spacing:.02em;margin-top:1px}
+.k .dg{position:absolute;top:2px;right:5px;font-size:9px;color:var(--muted)}
+.k.down{transform:translateY(2px);box-shadow:inset 0 1px 3px rgba(0,0,0,.6);background:#1f2226}
+.k.long{outline:2px solid var(--key-alt);outline-offset:-2px}
+.k.guess::after{content:"?";position:absolute;bottom:1px;left:5px;font-size:9px;color:var(--warn)}
+.k.pwr{height:44px;border-radius:50%;width:44px;font-size:18px;align-self:center}
+.lamp{width:12px;height:12px;border-radius:50%;background:#222;border:1px solid #000;align-self:center}
+.lamp.rx{background:var(--ok);box-shadow:0 0 10px var(--ok)} .lamp.tx{background:var(--tx);box-shadow:0 0 12px var(--tx)}
+.lbl{font-size:10px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;text-align:center}
+
+.slider{display:flex;flex-direction:column;gap:4px}
+.slider input{width:100%;accent-color:var(--key-alt)}
+.slider .row{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);letter-spacing:.1em}
+
+/* ---------- LCD ---------- */
+.lcd{position:relative;border-radius:10px;padding:10px 14px 12px;border:3px solid #050505;
+  background:radial-gradient(120% 140% at 30% 0%,var(--lcd-bg1),var(--lcd-bg2));
+  box-shadow:inset 0 0 22px rgba(80,40,0,.55);color:var(--seg);min-height:230px;transition:filter .2s}
+.lcd.off{filter:brightness(.18) saturate(.3)}
+.icons{display:flex;flex-wrap:wrap;gap:3px 8px;font-size:10.5px;font-weight:700;letter-spacing:.04em;min-height:16px}
+.ic{opacity:.08;transition:opacity .08s}
+.ic.on{opacity:1}
+.meter{display:grid;grid-template-columns:34px 1fr;gap:2px 8px;align-items:center;margin:6px 0 4px}
+.bars{display:grid;grid-template-columns:repeat(20,1fr);gap:2px;height:12px}
+.bars.sub{grid-template-columns:repeat(20,1fr);height:7px}
+.bar{background:var(--ghost);border-radius:1px}
+.bar.on{background:var(--seg)}
+.scale{display:grid;grid-template-columns:repeat(20,1fr);font-size:9px;font-weight:700}
+.mlabel{font-size:9px;font-weight:800;letter-spacing:.06em}
+.mid{display:grid;grid-template-columns:70px minmax(0,1fr) 64px;align-items:end;gap:6px;margin-top:4px}
+.mode{font-weight:800;font-size:17px;letter-spacing:.04em;line-height:1}
+.side{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:800}
+.freq{display:flex;justify-content:flex-end;align-items:flex-end;height:78px}
+.freq svg{height:74px;width:auto;max-width:100%}
+.menuno{font-size:22px;font-weight:800;font-family:ui-monospace,Consolas,monospace;text-align:right;min-height:26px}
+.status{margin-top:6px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.status .txt{font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;font-size:21px;font-weight:700;letter-spacing:.14em;white-space:pre;
+  background:rgba(60,30,0,.08);padding:0 6px;border-radius:3px;min-width:12ch;text-align:right}
+.err{position:absolute;right:12px;top:8px;font-weight:800;font-size:12px}
+.noconn{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-weight:800;letter-spacing:.2em;color:#f2b04a;font-size:13px}
+.lcd.off .noconn{display:flex;filter:brightness(5.5)}
+
+/* ---------- knobs ---------- */
+.knob{position:relative;border-radius:50%;cursor:grab;touch-action:none;margin:0 auto;
+  background:radial-gradient(circle at 35% 30%,#4a4f57,#1c1f23 60%,#0d0e10);border:1px solid #000;
+  box-shadow:0 6px 14px rgba(0,0,0,.6),inset 0 2px 1px rgba(255,255,255,.12)}
+.knob:active{cursor:grabbing}
+.knob .mark{position:absolute;left:50%;top:7%;width:5px;height:14%;margin-left:-2.5px;border-radius:3px;background:#c9ced6}
+.knob .dimple{position:absolute;width:22%;height:22%;left:26%;top:18%;border-radius:50%;background:radial-gradient(circle at 40% 35%,#15171a,#2c3036)}
+.knob.vfo{width:170px;height:170px}
+.knob.sm{width:70px;height:70px}
+.knob.xs{width:54px;height:54px}
+.krow{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.rate{display:flex;gap:4px;justify-content:center;flex-wrap:wrap}
+.rate button{background:var(--body2);color:var(--muted);border:1px solid #2e3238;border-radius:5px;font-size:11px;padding:2px 7px;cursor:pointer}
+.rate button.on{color:#111;background:var(--key-alt);border-color:var(--key-alt)}
+
+/* ---------- lower area ---------- */
+.below{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;margin-top:14px}
+.card{background:#15171a;border:1px solid #23262b;border-radius:12px;padding:12px}
+.card h3{margin:0 0 8px;font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:600;text-transform:uppercase}
+.row2{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input[type=text],input[type=number]{background:#0e0f11;color:var(--ink);border:1px solid #2e3238;border-radius:6px;padding:6px 8px;font:13px ui-monospace,Consolas,monospace}
+.log{height:230px;overflow:auto;overflow-wrap:anywhere;font:12px/1.45 ui-monospace,Consolas,monospace;background:#0b0c0e;border-radius:8px;padding:6px 8px}
+.log .rx{color:#9fd3ff} .log .tx{color:#ffd28a} .log .t{color:#555}
+.kv{display:grid;grid-template-columns:auto minmax(0,1fr);overflow-wrap:anywhere;gap:2px 10px;font:12px ui-monospace,Consolas,monospace}
+.kv span:nth-child(odd){color:var(--muted)}
+.hint{font-size:12px;color:var(--muted)}
+kbd{background:#23262b;border-radius:4px;padding:0 5px;font-size:11px}
+
+@media (max-width:980px){
+  .panel{grid-template-columns:minmax(0,1fr);}
+  .col.left{flex-direction:row;flex-wrap:wrap;justify-content:center}
+  .below{grid-template-columns:minmax(0,1fr)}
+}
+@media (max-width:560px){
+  .wrap{padding:8px}
+  .panel{padding:10px;gap:12px}
+  .freq svg{height:52px}
+  .mid{grid-template-columns:44px minmax(0,1fr) 44px}
+  .mode{font-size:14px}
+  .status .txt{font-size:16px}
+  .knob.vfo{width:140px;height:140px}
+  .keys.main{grid-template-columns:repeat(4,1fr)!important}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div class="brand">TS-480 <small>remote control panel</small></div>
+    <span class="pill"><span id="conn" class="dot"></span><span id="connTxt">connecting…</span></span>
+    <span class="pill" id="freqPill">—</span>
+    <div class="spacer"></div>
+    <button class="tbtn" id="btnReconnect" title="Send 02 (reconnect / redraw request)">Redraw</button>
+  </div>
+
+  <div class="panel" id="panel">
+    <!-- left column -->
+    <div class="col left">
+      <div class="krow" style="justify-content:center;gap:14px">
+        <button class="k pwr" data-key="POWER">⏻</button>
+        <div class="lamp" id="lamp" title="RX/TX lamp"></div>
+      </div>
+      <div class="keys" style="grid-template-columns:1fr 1fr" id="kLeft"></div>
+      <div class="slider"><div class="row"><span>AF</span><span id="afv"></span></div>
+        <input type="range" id="af" min="0" max="255"></div>
+      <div class="slider"><div class="row"><span>SQL</span><span id="sqlv"></span></div>
+        <input type="range" id="sql" min="0" max="255"></div>
+      <div class="keys" style="grid-template-columns:1fr 1fr" id="kLeft2"></div>
+    </div>
+
+    <!-- center -->
+    <div class="col">
+      <div class="lcd off" id="lcd">
+        <div class="noconn" id="noconn">NO LINK</div>
+        <div class="err" id="err"></div>
+        <div class="icons" id="icons1"></div>
+        <div class="meter">
+          <span class="mlabel">S</span>
+          <div>
+            <div class="scale" id="scale"></div>
+            <div class="bars" id="mMain"></div>
+          </div>
+          <span class="mlabel" id="subLbl">SWR</span>
+          <div class="bars sub" id="mSub"></div>
+        </div>
+        <div class="mid">
+          <div class="side">
+            <span class="ic" data-ic="A">◂A</span><span class="ic" data-ic="B">◂B</span><span class="ic" data-ic="M">◂M</span>
+            <span class="mode" id="mode"></span>
+          </div>
+          <div class="freq" id="freq"></div>
+          <div class="side" style="align-items:flex-end">
+            <div class="menuno" id="menuno"></div>
+            <span class="ic" data-ic="AUTO">AUTO</span>
+            <span class="ic" data-ic="SPLIT">SPLIT</span>
+          </div>
+        </div>
+        <div class="status">
+          <div class="icons" id="icons2"></div>
+          <div class="txt" id="status"></div>
+        </div>
+      </div>
+      <div class="keys main" id="kMain" style="grid-template-columns:repeat(7,1fr)"></div>
+    </div>
+
+    <!-- right column -->
+    <div class="col">
+      <div class="keys" style="grid-template-columns:repeat(4,1fr)" id="kRight"></div>
+      <div class="krow">
+        <div style="text-align:center"><div class="knob sm" id="kMulti"><div class="mark"></div></div><div class="lbl" style="margin-top:4px">Multi/CH</div></div>
+        <div class="slider" style="flex:1"><div class="row"><span>IF SHIFT</span><span id="ifv"></span></div>
+          <input type="range" id="ifshift" min="0" max="1022"></div>
+      </div>
+      <div class="knob vfo" id="kVfo"><div class="mark"></div><div class="dimple"></div></div>
+      <div class="rate" id="rate"></div>
+      <div class="krow">
+        <div class="keys" style="grid-template-columns:repeat(3,1fr);flex:1" id="kRit"></div>
+        <div style="text-align:center"><div class="knob xs" id="kRitK"><div class="mark"></div></div><div class="lbl" style="margin-top:3px">RIT/XIT</div></div>
+      </div>
+      <div class="keys" style="grid-template-columns:repeat(4,1fr)" id="kMem"></div>
+    </div>
+  </div>
+
+  <div class="below">
+    <div class="card">
+      <h3>Direct frequency · raw frames</h3>
+      <div class="row2" style="margin-bottom:8px">
+        <input type="number" id="fIn" placeholder="kHz, e.g. 14074" step="0.01" style="width:170px">
+        <button class="tbtn" id="fGo" title="Sends ENT, digits, ENT">Enter (ENT)</button>
+        <span class="hint">keypad macro</span>
+      </div>
+      <div class="row2" style="margin-bottom:10px">
+        <input type="text" id="rawIn" placeholder="raw: N1   or   hex: 4E 31" style="flex:1;min-width:180px">
+        <button class="tbtn" id="rawGo">Send</button>
+      </div>
+      <h3>Decoded state</h3>
+      <div class="kv" id="kv"></div>
+      <p class="hint" style="margin-top:10px"><kbd>↑</kbd>/<kbd>↓</kbd> VFO · <kbd>Shift</kbd> ×10 · <kbd>PgUp</kbd>/<kbd>PgDn</kbd> MULTI · wheel over knobs · hold a key &gt; 1 s = long press. Keys marked <span style="color:var(--warn)">?</span> use guessed codes.</p>
+    </div>
+    <div class="card">
+      <h3>Traffic <span style="text-transform:none;letter-spacing:0">(<span class="rx">rx</span> radio→panel, <span class="tx">tx</span> panel→radio, keepalives hidden)</span></h3>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ---------------- websocket ----------------
+let ws, KEYS = {}, S = null, connected = false;
+function send(o){ if(ws && ws.readyState===1) ws.send(JSON.stringify(o)); }
+function connect(){
+  ws = new WebSocket((location.protocol==="https:"?"wss://":"ws://")+location.host+"/ws");
+  ws.onmessage = e => {
+    const m = JSON.parse(e.data);
+    if(m.type==="hello"){ for(const k of m.keys) KEYS[k.name]=k; buildKeys(); }
+    else if(m.type==="state") render(m);
+    else if(m.type==="log") addLog(m.entry);
+  };
+  ws.onclose = () => { setConn(false,"server offline"); setTimeout(connect,1500); };
+}
+
+// ---------------- keys ----------------
+const LAYOUT = {
+  kLeft:["PF","ATT","AT","MENU"],
+  kLeft2:["NR","DNL","FIL","BC","MODE","SCAN"],
+  kMain:["CH1","CH2","CH3","PWR","MIC","KEY","NB","VOX","PROC","MTR","AGC","ENT","FINE","MHZ"],
+  kRight:["DOWN","UP","AB","ASB"],
+  kRit:["CL","XIT","RIT"],
+  kMem:["QMI","QMR"],
+};
+function keyEl(el){
+  const name = el.dataset.key; let t=null;
+  const down = ev => { ev.preventDefault(); if(el.classList.contains("down")) return;
+    el.setPointerCapture && ev.pointerId!==undefined && el.setPointerCapture(ev.pointerId);
+    el.classList.add("down"); send({op:"down",key:name});
+    t=setTimeout(()=>el.classList.add("long"),1000); };
+  const up = () => { if(!el.classList.contains("down")) return;
+    clearTimeout(t); el.classList.remove("down","long"); send({op:"up",key:name}); };
+  el.addEventListener("pointerdown",down);
+  el.addEventListener("pointerup",up); el.addEventListener("pointercancel",up); el.addEventListener("lostpointercapture",up);
+  el.addEventListener("contextmenu",e=>e.preventDefault());
+}
+function buildKeys(){
+  for(const [id,names] of Object.entries(LAYOUT)){
+    const box=document.getElementById(id); box.innerHTML="";
+    for(const n of names){ const k=KEYS[n]; if(!k) continue;
+      const b=document.createElement("button"); b.className="k"+(k.verified?"":" guess"); b.dataset.key=n;
+      b.title=`${k.label}${k.alt?" / "+k.alt:""}  — code '${k.code}' (0x${k.code.charCodeAt(0).toString(16).toUpperCase()})`;
+      b.innerHTML=`<span>${k.label}</span>${k.alt?`<span class="alt">${k.alt}</span>`:""}${k.digit?`<span class="dg">${k.digit}</span>`:""}`;
+      box.appendChild(b); keyEl(b); }
+  }
+  document.querySelectorAll('[data-key="POWER"]').forEach(keyEl);
+}
+
+// ---------------- knobs ----------------
+let rate = 2;
+function knob(el, which, countsPerTurn, mult=()=>1){
+  let ang=0, last=null, accum=0;
+  const setAng=()=>el.style.transform=`rotate(${ang}deg)`;
+  const emit=d=>{ accum+=d*countsPerTurn/360; const n=Math.trunc(accum); if(n){ accum-=n; send({op:"enc",which,delta:n*mult()}); } };
+  const center=()=>{ const r=el.getBoundingClientRect(); return [r.left+r.width/2, r.top+r.height/2]; };
+  el.addEventListener("pointerdown",e=>{ el.setPointerCapture(e.pointerId); const [cx,cy]=center(); last=Math.atan2(e.clientY-cy,e.clientX-cx); });
+  el.addEventListener("pointermove",e=>{ if(last===null) return; const [cx,cy]=center(); const a=Math.atan2(e.clientY-cy,e.clientX-cx);
+    let d=(a-last)*180/Math.PI; if(d>180)d-=360; if(d<-180)d+=360; last=a; ang+=d; setAng(); emit(d); });
+  const end=()=>{last=null}; el.addEventListener("pointerup",end); el.addEventListener("pointercancel",end);
+  el.addEventListener("wheel",e=>{ e.preventDefault(); const s=e.deltaY<0?1:-1; ang+=s*360/countsPerTurn*4; setAng();
+    send({op:"enc",which,delta:s*mult()*(e.shiftKey?10:1)}); },{passive:false});
+  return (n)=>{ ang+=n*360/countsPerTurn*4; setAng(); };
+}
+const vfoSpin = knob(document.getElementById("kVfo"),"vfo",100,()=>rate);
+const multiSpin = knob(document.getElementById("kMulti"),"multi",20);
+knob(document.getElementById("kRitK"),"rit",30);
+const rateBox=document.getElementById("rate");
+[1,2,5,20,100].forEach(r=>{ const b=document.createElement("button"); b.textContent="×"+r; b.onclick=()=>{rate=r;
+  [...rateBox.children].forEach(c=>c.classList.toggle("on",c===b));}; if(r===rate)b.classList.add("on"); rateBox.appendChild(b); });
+const rl=document.createElement("span"); rl.className="lbl"; rl.style.cssText="width:100%;margin-top:2px"; rl.textContent="counts / step"; rateBox.appendChild(rl);
+
+document.addEventListener("keydown",e=>{
+  if(e.target.tagName==="INPUT") return;
+  const m=e.shiftKey?10:1;
+  if(e.key==="ArrowUp"){ e.preventDefault(); send({op:"enc",which:"vfo",delta:rate*m}); vfoSpin(1); }
+  else if(e.key==="ArrowDown"){ e.preventDefault(); send({op:"enc",which:"vfo",delta:-rate*m}); vfoSpin(-1); }
+  else if(e.key==="PageUp"){ e.preventDefault(); send({op:"enc",which:"multi",delta:1}); multiSpin(1); }
+  else if(e.key==="PageDown"){ e.preventDefault(); send({op:"enc",which:"multi",delta:-1}); multiSpin(-1); }
+});
+
+// ---------------- pots ----------------
+function pot(id,which,fmt){
+  const el=document.getElementById(id), v=document.getElementById(id==="ifshift"?"ifv":id+"v"); let t=null, busy=false;
+  el.addEventListener("input",()=>{ busy=true; v.textContent=fmt(+el.value); clearTimeout(t);
+    t=setTimeout(()=>{ send({op:"pot",which,value:+el.value}); busy=false; },40); });
+  if(id==="ifshift") el.addEventListener("dblclick",()=>{ el.value=511; el.dispatchEvent(new Event("input")); });
+  return val=>{ if(!busy && document.activeElement!==el){ el.value=val; v.textContent=fmt(val);} };
+}
+const setAf=pot("af","af",v=>Math.round(v/2.55)+"%");
+const setSql=pot("sql","sql",v=>Math.round(v/2.55)+"%");
+const setIf=pot("ifshift","ifshift",v=>(v-511>0?"+":"")+(v-511));
+
+// ---------------- LCD ----------------
+const SEG = {"0":"abcdef","1":"bc","2":"abged","3":"abgcd","4":"fgbc","5":"afgcd","6":"afgedc","7":"abc","8":"abcdefg","9":"abcdfg",
+  " ":"","-":"g","_":"d","A":"abcefg","b":"cdefg","B":"cdefg","C":"adef","c":"deg","d":"bcdeg","D":"bcdeg","E":"adefg","F":"aefg",
+  "G":"acdef","H":"bcefg","h":"cefg","I":"bc","i":"c","J":"bcde","L":"def","n":"ceg","N":"abcef","o":"cdeg","O":"abcdef","P":"abefg",
+  "q":"abcfg","r":"eg","R":"eg","S":"afgcd","t":"defg","T":"defg","U":"bcdef","u":"cde","y":"bcdfg","Y":"bcdfg","=":"dg","?":"abeg"};
+const SEGP = {a:"M11,4 L49,4 L43,10 L17,10Z", b:"M51,6 L51,46 L45,42 L45,12Z", c:"M51,54 L51,94 L45,88 L45,58Z",
+  d:"M11,96 L49,96 L43,90 L17,90Z", e:"M9,54 L9,94 L15,88 L15,58Z", f:"M9,6 L9,46 L15,42 L15,12Z", g:"M12,50 L17,45 L43,45 L48,50 L43,55 L17,55Z"};
+function sevenSeg(text){
+  // text may contain '.' after a char -> decimal point
+  const cells=[]; for(const ch of text){ if(ch==="." && cells.length) cells[cells.length-1].dp=true; else cells.push({ch,dp:false}); }
+  const W=66; let s=`<svg viewBox="0 0 ${cells.length*W+6} 100" xmlns="http://www.w3.org/2000/svg"><g transform="skewX(-6) translate(8,0)">`;
+  cells.forEach((c,i)=>{ const on=SEG[c.ch]??""; s+=`<g transform="translate(${i*W},0)">`;
+    for(const [k,p] of Object.entries(SEGP)) s+=`<path d="${p}" fill="${on.includes(k)?"var(--seg)":"var(--ghost)"}"/>`;
+    s+=`<rect x="54" y="89" width="7" height="7" fill="${c.dp?"var(--seg)":"var(--ghost)"}"/></g>`; });
+  return s+"</g></svg>";
+}
+const ICONS1=["▸T","◂R","AT","ANT1","ANT2","ATT","PRE","VOX","PROC","MENU","QM★","★","REC","NB","AGC","-F","NAR","2","MHz","FINE"];
+const ICONS2=["M.CH","M.SCR","LOCK","F.LOCK","RIT","XIT","T","CT","PC","◂1","◂2","◂3","▸1","▸2","▸3"];
+function mkIcons(id,list){ document.getElementById(id).innerHTML=list.map(t=>`<span class="ic" data-ic="${t}">${t}</span>`).join(""); }
+mkIcons("icons1",ICONS1); mkIcons("icons2",ICONS2);
+const mMain=document.getElementById("mMain"), mSub=document.getElementById("mSub");
+for(let i=0;i<20;i++){ mMain.insertAdjacentHTML("beforeend",'<div class="bar"></div>'); mSub.insertAdjacentHTML("beforeend",'<div class="bar"></div>'); }
+document.getElementById("scale").innerHTML=Array.from({length:20},(_,i)=>`<span>${({2:"1",4:"3",6:"5",8:"7",10:"9",12:"+20",15:"+40",18:"+60"})[i]??""}</span>`).join("");
+
+function setConn(ok,txt){ connected=ok; document.getElementById("conn").className="dot "+(ok?"ok":"bad");
+  document.getElementById("connTxt").textContent=txt; }
+
+function render(m){
+  const s=m.state; S=s;
+  setConn(m.connected, m.connected ? (s.power===false?"linked · radio off":"linked") : "no data from radio");
+  const live=m.connected && s.power!==false;
+  const lcd=document.getElementById("lcd");
+  lcd.classList.toggle("off",!live);
+  document.getElementById("noconn").textContent = m.connected ? "POWER OFF" : "NO LINK";
+  lcd.style.filter = live ? `brightness(${0.55+0.12*(s.brightness??4)})` : "";
+  document.getElementById("freq").innerHTML=sevenSeg(s.freq);
+  document.getElementById("status").textContent=s.status;
+  document.getElementById("mode").textContent=s.mode;
+  document.getElementById("menuno").textContent=(s.menu_no||"").trim();
+  document.getElementById("err").textContent= s.error && s.error!=="0" ? "ERR "+s.error : "";
+  const icons=new Set(s.icons);
+  document.querySelectorAll("#lcd .ic").forEach(e=>e.classList.toggle("on",icons.has(e.dataset.ic)));
+  [...mMain.children].forEach((b,i)=>b.classList.toggle("on",i<s.meter_main));
+  [...mSub.children].forEach((b,i)=>b.classList.toggle("on",i<s.meter_sub*2));
+  document.getElementById("subLbl").textContent={"71":"ALC","72":"SWR","73":"COMP"}[s.meter_sel]||"SUB";
+  const lamp=document.getElementById("lamp"); lamp.className="lamp "+(s.lamp==="rx"?"rx":s.lamp==="tx"?"tx":"");
+  document.getElementById("freqPill").textContent= s.freq_hz ? (s.freq_hz/1e6).toFixed(5)+" MHz "+(s.mode||"") : "—";
+  setAf(m.pots.af); setSql(m.pots.sql); setIf(m.pots.ifshift);
+  const kv={power:s.power, freq_raw:JSON.stringify(s.freq_raw), status:JSON.stringify(s.status), mode:`${s.mode} (9${s.mode_code??"?"})`,
+    meter:`${s.meter_main} / ${s.meter_sub}  sel>${s.meter_sel}`, menu:`${s.menu_no} ${s.menu_entry} ${s.param}`, model:s.model,
+    flags:Object.entries(s.flags).map(([k,v])=>k+v).join(" "), misc:Object.entries(s.misc).map(([k,v])=>k+":"+v).join("  ")||"—"};
+  document.getElementById("kv").innerHTML=Object.entries(kv).map(([k,v])=>`<span>${k}</span><span>${String(v??"").replace(/</g,"&lt;")}</span>`).join("");
+}
+
+// ---------------- log / raw / freq ----------------
+const logEl=document.getElementById("log");
+function addLog(e){
+  const d=new Date(e.t*1000), ts=d.toTimeString().slice(0,8)+"."+String(d.getMilliseconds()).padStart(3,"0");
+  const line=document.createElement("div"); line.className=e.dir;
+  line.innerHTML=`<span class="t">${ts}</span> ${e.dir} ${e.ascii.replace(/</g,"&lt;").padEnd(10," ")} <span class="t">${e.hex}</span> ${e.text?"· "+e.text:""}`;
+  const stick=logEl.scrollTop+logEl.clientHeight>=logEl.scrollHeight-4;
+  logEl.appendChild(line); while(logEl.children.length>400) logEl.firstChild.remove();
+  if(stick) logEl.scrollTop=logEl.scrollHeight;
+}
+document.getElementById("rawGo").onclick=()=>{ const v=document.getElementById("rawIn").value; if(v) send({op:"raw",text:v}); };
+document.getElementById("rawIn").addEventListener("keydown",e=>{ if(e.key==="Enter") document.getElementById("rawGo").click(); });
+document.getElementById("fGo").onclick=()=>{ const v=parseFloat(document.getElementById("fIn").value); if(v>0) send({op:"freq",khz:v}); };
+document.getElementById("fIn").addEventListener("keydown",e=>{ if(e.key==="Enter") document.getElementById("fGo").click(); });
+document.getElementById("btnReconnect").onclick=()=>send({op:"reconnect"});
+document.getElementById("freq").innerHTML=sevenSeg("       ");
+connect();
+</script>
+</body>
+</html>
