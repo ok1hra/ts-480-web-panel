@@ -108,4 +108,3 @@ version. See [LICENSE](LICENSE).
 
 Kenwood and TS-480 are trademarks of JVCKENWOOD Corporation. This project is
 not affiliated with or endorsed by Kenwood.
-# TS-480 web panel
