@@ -1,21 +1,41 @@
 # TS-480 Panel: software replacement for the control head
 
-This program emulates the Kenwood TS-480 control panel (control head) directly
-on the panel ↔ radio link (RJ12, 57600 Bd TTL). It does not use CAT. The radio
-behaves as if the original panel were connected. You get the same display, the
-keys work including long press, and so do the VFO, MULTI and RIT/XIT knobs and
-the AF, SQL and IF SHIFT potentiometers.
+![The TS-480 web panel](docs/web-panel.png)
+
+This program replaces the Kenwood TS-480 control panel (control head) with a
+web page. It talks to the radio over the panel ↔ radio link (RJ12, 5 V TTL,
+57600 Bd), not over CAT, so the radio behaves exactly as if its own panel were
+connected: the same display, all keys including long presses, the VFO, MULTI
+and RIT/XIT knobs, and the AF, SQL and IF SHIFT potentiometers.
 
 ```
  browser (PC / tablet / phone)
         │  WebSocket
  ts480.server  (Python, aiohttp)
-        │  PanelLink: keepalive, reply to the O query, reconnect, encoder accumulation
-        │  DisplayState: decoding of LCD commands
- USB-UART 5 V  ──RJ12──  TS-480 (main unit)
+        │  PanelLink: keepalive, reply to the O query, keys, encoders
+        │  DisplayState: decoding of the LCD commands
+ USB-UART 5 V  ──RJ12──  TS-480 main unit
 ```
 
-The protocol is described in **[PROTOCOL.md](PROTOCOL.md)**.
+The protocol is documented in **[PROTOCOL.md](PROTOCOL.md)**.
+
+## Three ways to run it
+
+| mode | the web panel… | physical panel | command |
+|---|---|---|---|
+| **stand-alone** | *is* the panel | disconnected | `--port <serial port to the radio>` |
+| **beside the real panel** | mirrors the display and adds its own key presses | connected through `tools/bridge.py` | `--bridge 127.0.0.1:8491` |
+| **simulator** | drives a built-in model of the radio | not needed | `--sim` |
+
+## Installation
+
+```bash
+git clone … ts-480-web-panel && cd ts-480-web-panel
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+```
+
+Python 3.10 or newer; pyserial and aiohttp are the only dependencies.
 
 ## Wiring
 
@@ -27,67 +47,146 @@ The protocol is described in **[PROTOCOL.md](PROTOCOL.md)**.
 | 6 AF + 1 SPK GND | to an AF amplifier / sound card (the panel does not process audio) |
 | 2 +8 V | do not connect |
 
-* The original panel must be **disconnected**. Only one driver may be on the
-  TX line.
-* Do not connect an RS-232 converter (±12 V) to pins 4 and 5.
+* 5 V TTL, **not RS-232** – never connect a ±12 V converter to pins 4 and 5.
+* Only one panel may drive the TX line: in stand-alone mode the physical
+  panel must be unplugged.
+* For running beside the real panel the cable is cut and both halves go to two
+  adapters (radio side and panel side), see below.
 
 ## Running
 
-```bash
-pip install -r requirements.txt
-python -m ts480.server --port /dev/ttyUSB0            # Windows: --port COM5
-python -m ts480.server --port socket://192.168.1.50:4000   # UART over the network (ser2net, ESP32…)
-python -m ts480.server --sim                          # built-in simulator, no hardware
-# then open http://127.0.0.1:8480   (for network access: --http 0.0.0.0:8480)
-```
-
-Controls:
-
-* Keys are operated by mouse or touch. Holding a key for more than 1 s sends a
-  long press (`--long-press` changes the threshold).
-* Knobs are turned by dragging or with the mouse wheel. Wheel with Shift gives ×10.
-* Keyboard: `↑`/`↓` tunes the VFO, `PgUp`/`PgDn` controls MULTI.
-* The "counts/step" selector sets how many encoder pulses one step sends.
-* "Direct frequency" enters a frequency via the panel keypad (ENT, digits,
-  ENT).
-* "Raw frames" sends an arbitrary frame (`N1` or `hex: 4E 31`). Useful for
-  experiments. The log shows all traffic in both directions, including decoding.
-
-## Filling in the undocumented parts
-
-The sniffer `tools/sniff.py` is a passive tap between the original panel and the
-radio. It needs two adapters, each with only RX and GND connected:
+### Stand-alone (the web panel replaces the panel)
 
 ```bash
-python tools/sniff.py --radio /dev/ttyUSB0 --panel /dev/ttyUSB1 --out tap.jsonl
+.venv/bin/python -m ts480.server --port /dev/ttyUSB0          # Windows: --port COM5
+.venv/bin/python -m ts480.server --port socket://192.168.1.50:4000   # UART over the network (ser2net, ESP32…)
 ```
 
-When a key is pressed on the original panel, it prints the received frame and
-the changes of the decoded state. The tables `KEYS`, `FLAG_LABELS` and
-`MODE_NAMES` in `ts480/protocol.py` are in one place and easy to correct.
+Open http://127.0.0.1:8480 and press ⏻ to switch the radio on.
+
+* The server answers the radio's keepalives (`FF` every 5 s) and its `O`
+  query with the positions of AF, SQL and IF SHIFT. **The radio switches itself
+  off about 4 s after the panel stops answering**, so stopping the server
+  switches the radio off.
+* The web panel starts with **AF at 0** (silent); turn the AF knob up.
+* ⏻ works like the real key: `01` switches the radio on, `00` switches it off.
+
+### Beside the real panel
+
+Cut the panel cable and connect both halves to USB-UART adapters. The bridge
+copies every byte between panel and radio, logs both directions and offers a
+tap for the web panel:
+
+```bash
+RADIO=/dev/ttyUSB0 PANEL=/dev/ttyUSB1 tools/bridge.sh start     # stop | restart | status
+.venv/bin/python -m ts480.server --bridge 127.0.0.1:8491
+```
+
+* The web panel shows the same display as the physical one and its keys and
+  knobs are injected into the line as if the physical panel had sent them; both
+  can be used at the same time.
+* The physical panel answers the keepalives, so it must stay connected and on.
+* `tools/bridge.sh restart` restarts the bridge with a gap of ~0.2 s, short
+  enough that the radio stays on.
+
+### Stand-alone with full logging
+
+A pair of virtual serial ports takes the place of the panel cable, so the
+bridge logs every byte while the web panel is the only panel:
+
+```bash
+socat pty,raw,echo=0,link=$PWD/logs/vpanel-a pty,raw,echo=0,link=$PWD/logs/vpanel-b &
+.venv/bin/python -m ts480.server --port $PWD/logs/vpanel-b
+RADIO=/dev/ttyUSB0 PANEL=$PWD/logs/vpanel-a tools/bridge.sh start
+```
+
+### Simulator
+
+```bash
+.venv/bin/python -m ts480.server --sim
+```
+
+### Options
+
+| option | default | meaning |
+|---|---|---|
+| `--port PORT` | – | serial port or pyserial URL of the line to the radio |
+| `--bridge HOST:PORT` | – | tap of `tools/bridge.py` |
+| `--sim` | – | built-in simulator |
+| `--http HOST:PORT` | `127.0.0.1:8480` | address of the web page |
+| `--long-press S` | `1.0` | seconds a key must be held for a long press |
+| `-v` | | verbose log |
+
+The serial line runs at 57600 Bd, 8 data bits, no parity, 2 stop bits.
+`--http 0.0.0.0:8480` makes the panel reachable from the network – anyone who
+can open the page can operate the radio, including transmitting, so only do
+this on a trusted network or use an SSH tunnel
+(`ssh -L 8480:127.0.0.1:8480 user@host`).
+
+## Using the web panel
+
+* **Keys**: click or touch. Holding a key for more than 1 s sends a long press
+  (the second function printed in orange above the key).
+* **Knobs**: drag in a circle or use the mouse wheel (Shift = ×10). AF/SQL and
+  MULTI/IF SHIFT are concentric: the outer ring and the inner knob are
+  separate controls. Double-click the IF SHIFT ring to centre it.
+* **Keyboard**: `↑`/`↓` tune the VFO, `PgUp`/`PgDn` turn MULTI.
+* **VFO ×** (top right): how many encoder counts one knob step sends
+  (one count is about 5 Hz in normal tuning).
+* **Display**: frequency, sub-display, mode, S/PO meter, ALC/SWR/COMP meter and
+  every icon as sent by the radio. Texts that the real panel draws from its own
+  memory are drawn here too:
+  menu descriptions (menu 00–60) and setting read-outs such as `PWR-  30`,
+  `HI- 2400`, `NB LV.- 6` or `TX TUNE`. The display brightness (menu 00, `oFF`
+  = backlight off) and the key illumination (menu 01) follow the radio.
+* **Direct frequency**: enters a frequency through the keypad (ENT, digits, ENT).
+* **Raw frames**: sends any frame to the radio (`N1` or `hex: 4E 31`).
+* **Redraw**: asks the radio to resend the whole display (`02`).
+* **Decoded state** and **Traffic**: what the radio sent, decoded, and the
+  traffic in both directions (keepalives hidden).
+
+## Debugging and research tools
+
+| tool | what it does |
+|---|---|
+| `tools/bridge.py`, `tools/bridge.sh` | in-line bridge: forwards, logs (`logs/console.txt`, `logs/bridge-*.jsonl`), text injection on TCP 8490 (`radio E1`, `panel ;0145000`), binary tap on TCP 8491 |
+| `tools/sniff.py` | passive tap with two RX-only adapters |
+| `tools/cat_probe.py` | sends CAT commands or injected panel frames and prints what the radio then sent to the panel |
+| `tools/cat_proxy.py`, `tools/catlink.py` | shares the CAT port between Kenwood ARCP-480 (under wine) and scripts |
+| `tools/xctl.py` | clicks, types and takes screenshots in an X display (ARCP-480 in Xvfb) |
+| `tools/menu_backup.py` | backs up, compares and restores all menu settings (Menu A and B) over CAT |
+| `tools/menu_scan.py` | walks through the menu and photographs the real panel (menu texts) |
+| `tools/key_test.py` | presses keys through the web panel and puts the real LCD (camera), the web panel and ARCP-480 side by side |
+
+The tables `KEYS`, `FLAG_LABELS` and `MODE_NAMES` in `ts480/protocol.py` and
+`MENU` / `SUBMODE` in `ts480/web/index.html` are the places to correct.
 
 ## Files
 
 * `ts480/protocol.py`: codec (frames, keys, encoders, display parser)
-* `ts480/link.py`: panel emulation on the line (keepalive, `O` query, reconnect, key timing)
-* `ts480/sim.py`: simplified simulator of the radio main unit
+* `ts480/link.py`: the panel's side of the line (keepalive, `O` query, POWER, key timing, encoders)
 * `ts480/server.py`: web server and WebSocket API
-* `ts480/web/index.html`: panel UI
-* `tools/sniff.py`: passive sniffer
-* `tests/`: parser tests against captured dumps from a real radio
+* `ts480/web/index.html`: the panel (SVG, measured on a front photo of the real panel)
+* `ts480/sim.py`: simplified simulator of the main unit
+* `tools/`: see above
+* `tests/`: tests against traffic captured from a real radio
 
 ## Status
 
-Verified in captured traffic: framing, keepalive, power-on and reconnect,
-all keys except MODE and SCAN, VFO, MULTI, RIT, AF, SQL, IF SHIFT,
-frequency, S-meter, most icons.
+Verified on a real TS-480HX (2026-11-13/14) with the bridge, CAT, a camera on
+the real panel and ARCP-480:
 
-Guesses (marked "?" in the UI or as `misc` in the log):
+* framing, keepalive (radio `FF` every 5 s, power-off ~4 s without an answer),
+  power on/off, redraw, `O` query
+* every key code (short and long press), VFO, MULTI, RIT/XIT, AF, SQL, IF SHIFT
+* frequency and decimal points, mode digit (= CAT `MD`), meters, almost all icons
+* menu mode and all setting read-outs (the radio sends only numbers, the
+  panel draws the texts)
+* stand-alone operation without the physical panel
 
-* key codes MODE (`E`) and SCAN (`F`)
-* table of the operating mode digit `9n`
-* bits `B` and `L`
-* decimal point mapping
+Still unknown: icon bits `B0`/`B1` (EQ), parts of `D`/`E`, the `L` byte, `R n`,
+the scale of the second meter value. Memory channels, Tone/CTCSS in FM and
+TF-SET in split were not tested.
 
 ## Credits and sources
 
@@ -97,7 +196,7 @@ Guesses (marked "?" in the UI or as `misc` in the log):
   The power-on dump used in `tests/test_protocol.py` comes from its
   `Radio/Power on sequence.md`.
 * RemoteRig documentation of the TS-480 separated control head operation.
-* Kenwood TS-480SAT/HX instruction manual (panel layout, key functions).
+* Kenwood TS-480SAT/HX instruction manual (panel layout, key functions, menu).
 
 ## License
 

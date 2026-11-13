@@ -17,10 +17,27 @@ It does not use CAT.
 - Tests: `python -m pytest -q tests`. Also verified in a browser (Playwright) against the simulator.
 - License GPL-3.0 (`LICENSE`), credits in `README.md`. All texts are in English.
 
+## Bench setup (2026-11-13, this machine)
+- `/dev/ttyUSB.panel` is wired to the RADIO, `/dev/ttyUSB.ts480` to the PANEL (udev names swapped).
+  `tools/bridge.sh` already uses the right roles. CAT: `/dev/ttyUSB.cat` 115200 Bd.
+- The radio powers OFF ~4 s after the panel stops answering keepalives. Restart the bridge only
+  with `tools/bridge.sh restart`. Power on again over CAT with `PS1;`.
+- Never `pkill -f` a pattern that also appears in your own shell command line; kill by PID
+  (`logs/bridge.pid`, `logs/web.pid`).
+- ARCP-480 (Kenwood CAT program) is installed under wine in `~/.wine-arcp480`. It runs in Xvfb `:77`
+  and talks through `tools/cat_proxy.py` (COM1 -> `logs/arcp-com` pty; scripts use TCP 8492 via
+  `tools/catlink.py`). All other wine COM ports are blocked in the registry so ARCP can never open the
+  panel/radio lines. Drive it with `tools/xctl.py` clicks only: a stray Enter hit ARCP's focused POWER
+  button once (it sends `PS9;` = power off).
+- A camera looks at the real panel: `ffmpeg ... -update 1 logs/cam.jpg` (pid in `logs/cam.pid`).
+- Menu settings backup (Menu A and B + main CAT state): `logs/menu-backup.json`;
+  `tools/menu_backup.py diff|restore logs/menu-backup.json`. The user allowed menu changes only if restored.
+- The user allowed transmitting for tests.
+
 ## Open items
-1. Verify with the sniffer on a real unit: codes MODE (`E`?) and SCAN (`F`?), the
-   operating mode digit `9n`, bits `B` and `L`, decimal point mapping (`F b1 b2 b3`), meaning of `3n`.
-2. Check whether the radio requires exact timing of the keepalive and state `4` (hold).
+1. Verified on the real unit: SCAN=`E`, MODE=`F`, `9n` = CAT MD code, most flag bits, keepalive.
+   Still unknown: bits `B0`/`B1` (EQ?), `D2`, `D4`–`D6`, `E2`–`E5`, the `L` byte, `R n`, `3n`, the sub-meter `bb`.
+2. Check state `4` (hold) and long-press timing on the real panel.
 3. Ideas: port to ESP32 (UART ↔ WiFi/WebSocket), AF audio over the network, multiple clients at once.
 
 ## Running

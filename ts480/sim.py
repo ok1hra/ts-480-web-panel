@@ -26,7 +26,7 @@ class RadioSim:
         self.on = False
         self.freq = [14_074_000, 7_074_000]
         self.vfo = 0
-        self.mode = 1
+        self.mode = 2  # USB (CAT MD code)
         self.rit = self.xit = False
         self.rit_off = 0
         self.seg = {"?": 0x80, "@": 0x84, "A": 0x81, "B": 0x80, "C": 0xC8, "D": 0x81, "E": 0x81}
@@ -176,7 +176,7 @@ class RadioSim:
         elif k == "ASB":
             self.freq[self.vfo ^ 1] = self.freq[self.vfo]
         elif k == "MODE":
-            self.mode = {1: 0, 0: 2, 2: 6, 6: 5, 5: 4, 4: 3, 3: 1}.get(self.mode, 1)
+            self.mode = {2: 1, 1: 3, 3: 7, 7: 6, 6: 5, 5: 4, 4: 2}.get(self.mode, 2)
         elif k == "MTR":
             self.meter_sel = self.meter_sel % 3 + 1
         elif k in ("UP", "DOWN"):

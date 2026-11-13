@@ -4,6 +4,8 @@
     python -m ts480.server --port /dev/ttyUSB0          # real radio
     python -m ts480.server --port socket://10.0.0.5:4000 # UART over network (ser2net)
     python -m ts480.server --sim                          # built-in simulator
+    python -m ts480.server --bridge 127.0.0.1:8491        # beside the real panel
+                                                          # (tools/bridge.py --tap 8491)
 Then open http://localhost:8480
 """
 from __future__ import annotations
@@ -24,9 +26,9 @@ log = logging.getLogger("ts480")
 
 
 class App:
-    def __init__(self, transport):
+    def __init__(self, transport, passive: bool = False):
         self.clients: set[web.WebSocketResponse] = set()
-        self.link = PanelLink(transport, on_update=self.broadcast)
+        self.link = PanelLink(transport, on_update=self.broadcast, passive=passive)
 
     def broadcast(self, msg: dict) -> None:
         if not self.clients:
@@ -84,6 +86,8 @@ def main() -> None:
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--port", help="serial port or pyserial URL (socket://host:port)")
     g.add_argument("--sim", action="store_true", help="use built-in radio simulator")
+    g.add_argument("--bridge", metavar="HOST:PORT",
+                   help="tap of tools/bridge.py: watch the real panel link and inject keys")
     ap.add_argument("--baud", type=int, default=57600)
     ap.add_argument("--http", default="127.0.0.1:8480", help="listen address host:port")
     ap.add_argument("--long-press", type=float, default=1.0, help="seconds until long press")
@@ -95,9 +99,11 @@ def main() -> None:
     if a.sim:
         from .sim import RadioSim
         transport = RadioSim()
+    elif a.bridge:
+        transport = SerialTransport(f"socket://{a.bridge}")
     else:
         transport = SerialTransport(a.port, a.baud)
-    app_state = App(transport)
+    app_state = App(transport, passive=bool(a.bridge))
     app_state.link.LONG_PRESS_S = a.long_press
 
     app = web.Application()
@@ -114,7 +120,8 @@ def main() -> None:
     app.on_cleanup.append(on_stop)
 
     host, port = a.http.rsplit(":", 1)
-    print(f"TS-480 panel on http://{host}:{port}  ({'simulator' if a.sim else a.port})")
+    src = "simulator" if a.sim else f"bridge tap {a.bridge}" if a.bridge else a.port
+    print(f"TS-480 panel on http://{host}:{port}  ({src})")
     web.run_app(app, host=host, port=int(port), print=None)
 
 

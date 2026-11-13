@@ -44,8 +44,9 @@ class Key:
 
 KEYS: dict[str, Key] = {k.name: k for k in [
     Key("POWER", "0", "⏻"),
-    Key("PF", "2", "PF"),
-    Key("ATT", "!", "ATT/PRE", "ANT 1/2"),
+    Key("PF", "1", "PF"),                  # VERIFIED 2026-11-13: physical PF sends "1"; here PF = menu 48
+                                           # function 67 (TX TUNE: CW carrier, sub-display "TX TUNE")
+    Key("ATT", "2", "ATT/PRE", "ANT 1/2"), # VERIFIED 2026-11-13: "2" cycles ATT -> PRE -> off
     Key("AT", "3", "AT"),
     Key("CH1", "4", "CH1", "REC", "1"),
     Key("CH2", "5", "CH2", "REC", "2"),
@@ -64,8 +65,8 @@ KEYS: dict[str, Key] = {k.name: k for k in [
     Key("FIL", "B", "FIL", "NAR"),
     Key("BC", "C", "BC", "CW.T"),
     Key("FINE", "D", "FINE", "STEP"),
-    Key("MODE", "E", "MODE", "", verified=False),   # GUESS: unassigned code 0x45
-    Key("SCAN", "F", "SCAN", "SG.SEL", verified=False),  # GUESS: 0x46
+    Key("SCAN", "E", "SCAN", "SG.SEL"),   # VERIFIED 2026-11-13 (injection: "SCAN P1")
+    Key("MODE", "F", "MODE"),             # VERIFIED 2026-11-13 (cycles SSB/CW/FSK/FM-AM)
     Key("MENU", "G", "MENU", "F.LOCK"),
     Key("MHZ", "H", "MHz", "M.STP"),
     Key("ASB", "I", "A=B", "SPLIT"),
@@ -75,8 +76,8 @@ KEYS: dict[str, Key] = {k.name: k for k in [
     Key("CL", "M", "CL"),
     Key("RIT", "N", "RIT"),
     Key("XIT", "O", "XIT"),
-    Key("DOWN", "P", "◀", "TF-SET"),   # band down (0x50)
-    Key("UP", "Q", "▶", "TF-SET"),     # band up   (0x51)
+    Key("DOWN", "Q", "▼", "TF-SET"),   # band down (0x51)  VERIFIED 2026-11-13 (7 -> 3.5 MHz)
+    Key("UP", "P", "▲", "TF-SET"),     # band up   (0x50)  VERIFIED 2026-11-13; holding repeats
 ]}
 KEY_BY_CODE = {k.code: k for k in KEYS.values()}
 DIGIT_KEYS = {k.digit: k for k in KEYS.values() if k.digit}
@@ -171,19 +172,25 @@ def decode_panel_frame(frame: bytes) -> str:
 # ---------------------------------------------------------------------------
 # Bit 7 is always set; bits 0..6 are annunciators.  Labels from the TS-480
 # manual (LCD item numbers) matched against captured values.
+# Bits checked on a real unit 2026-11-13 by toggling functions over CAT
+# (tools/cat_probe.py): ?0 PRE, ?1 ATT, ?2 PROC, ?4 NB, ?6 FINE, @2 ANT1,
+# @3 ANT2, A0 AGC, A1 AGC "OFF", A2 "-F" (fast), A3 NAR, A5 LOCK, B2 NR2,
+# B3 NR1, B4 BC2, B5 BC1, B6 DNL, C0 T, C1 CT, C2 F.LOCK, C3 PC, C4 RIT, C5 XIT,
+# D0 A, D1 B.  AGC off = A0+A1+A2.  ?3 is set in CW modes (break-in = VOX).
 FLAG_LABELS: dict[str, list[str]] = {
     "?": ["PRE", "ATT", "PROC", "VOX", "NB", "MHz", "FINE"],
     "@": ["QM★", "★", "ANT1", "ANT2", "MENU", "M.CH", "M.SCR"],
-    "A": ["AGC", "A1?", "-F", "NAR", "2", "LOCK", "REC"],
-    "B": ["B0?", "B1?", "B2?", "B3?", "B4?", "B5?", "B6?"],   # BC/NR/DNL/EQ – unmapped
+    "A": ["AGC", "OFF", "-F", "NAR", "2", "LOCK", "REC"],
+    "B": ["B0?", "B1?", "NR2", "NR1", "BC2", "BC1", "DNL"],   # bits 0, 1: RX/TX EQ?
     "C": ["T", "CT", "F.LOCK", "PC", "RIT", "XIT", "AUTO"],
     "D": ["A", "B", "M", "SPLIT", "▸T", "◂R", "AT"],
     "E": ["◂1", "◂2", "◂3", "▸1", "▸2", "▸3", "E6?"],
     "L": ["L0?", "L1?", "L2?", "L3?", "L4?", "L5?", "L6?"],
 }
 
-# '9x' mode digit.  GUESS (Kenwood CAT "MD" code minus one); verify with sniff.py
-MODE_NAMES = {0: "LSB", 1: "USB", 2: "CW", 3: "FM", 4: "AM", 5: "FSK", 6: "CW-R", 8: "FSK-R"}
+# '9x' mode digit = Kenwood CAT "MD" code.  VERIFIED 2026-11-13 (CAT MD1..MD9 sweep
+# through tools/cat_probe.py with tools/bridge.py on a real unit).
+MODE_NAMES = {1: "LSB", 2: "USB", 3: "CW", 4: "FM", 5: "AM", 6: "FSK", 7: "CW-R", 9: "FSK-R"}
 
 LAMP_NAMES = {0: "off", 1: "rx", 2: "tx"}
 
@@ -214,7 +221,9 @@ class DisplayState:
     dots: list[int] = field(default_factory=lambda: [0x80, 0x80, 0x80])
     menu_no: str = "  "
     menu_entry: str = ""
-    param: str = ""
+    menu_item: Optional[int] = None   # "Pnn": menu item, hex (P0A = menu 10)   VERIFIED
+    menu_value: Optional[int] = None  # "4hh": value index, hex, same as CAT EX  VERIFIED
+    param: str = ""                   # "2x": sub-display mode, "2E" in Menu mode, "20" normal
     meter_main: int = 0          # 0..20 bars (S / PO)
     meter_sub: int = 0           # 0..10 bars (SWR / ALC / COMP)
     meter_sel: str = ""
@@ -261,6 +270,8 @@ class DisplayState:
             "menu_no": self.menu_no,
             "menu_entry": self.menu_entry,
             "param": self.param,
+            "menu_item": self.menu_item,
+            "menu_value": self.menu_value,
             "meter_main": self.meter_main,
             "meter_sub": self.meter_sub,
             "meter_sel": self.meter_sel,
@@ -317,6 +328,15 @@ class DisplayState:
             self.menu_no = _text(body)
         elif c == "P":
             self.menu_entry = _text(body)
+            try:
+                self.menu_item = int(_text(body), 16)
+            except ValueError:
+                self.menu_item = None
+        elif c == "4" and n >= 1:
+            try:
+                self.menu_value = int(_text(body), 16)
+            except ValueError:
+                self.menu_value = None
         elif c == "2":
             self.param = "" if body == b"0" else _text(body)
         elif c == "6" and n == 1:
